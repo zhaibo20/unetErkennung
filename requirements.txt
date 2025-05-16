@@ -1,0 +1,14 @@
+flask
+opencv-python
+numpy
+pillow
+requests
+bootstrap
+jquery
+bootstrap-icons
+fastapi
+uvicorn
+torch
+torchvision
+scikit-image
+cryptography

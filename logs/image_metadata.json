@@ -1,0 +1,20 @@
+{
+  "20250408_172437": {
+    "original_path": "static\\uploads\\capture_20250408_172437.jpg",
+    "encrypted_path": "static\\encrypted\\encrypted_capture_20250408_172437.jpg",
+    "timestamp": "2025-04-08T17:24:37.463302",
+    "status": "active"
+  },
+  "20250429_133838": {
+    "original_path": "static\\uploads\\capture_20250429_133838.jpg",
+    "encrypted_path": "static\\encrypted\\encrypted_capture_20250429_133838.jpg",
+    "timestamp": "2025-04-29T13:38:38.345248",
+    "status": "active"
+  },
+  "20250429_133903": {
+    "original_path": "static\\uploads\\capture_20250429_133903.jpg",
+    "encrypted_path": "static\\encrypted\\encrypted_capture_20250429_133903.jpg",
+    "timestamp": "2025-04-29T13:39:03.365615",
+    "status": "active"
+  }
+}

@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>图像篡改检测系统</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 1rem 0;
+        }
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffffff !important;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-bottom: 2rem;
+            background: #ffffff;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+        .card-title {
+            color: #2a5298;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+        }
+        .preview-image {
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+        #detectionResult img {
+            max-height: 300px;
+            width: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn {
+            border-radius: 25px;
+            padding: 8px 25px;
+            margin: 5px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border: none;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #ff4d4d 100%);
+            border: none;
+        }
+        .form-control-range {
+            height: 8px;
+            border-radius: 4px;
+            background: #e9ecef;
+        }
+        .form-control-range::-webkit-slider-thumb {
+            background: #2a5298;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        #video {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .result-badge {
+            font-size: 1.1rem;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 5px 0;
+        }
+        .result-badge.tampered {
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .result-badge.normal {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        #detectionResult {
+            border-left: 5px solid #007bff;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+        }
+        #detectionResult .card-title {
+            color: #007bff;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        #detectionResult img {
+            border-radius: 0.5rem;
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        #detectionResult img:hover {
+            transform: scale(1.02);
+        }
+        
+        /* 篡改框样式 */
+        .tamper-box {
+            position: absolute;
+            border: 3px solid red;
+            box-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
+            animation: pulse 2s infinite;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.7); }
+            50% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.9); }
+            100% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.7); }
+        }
+        
+        .tamper-label {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            background: red;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+        
+        /* 图像容器样式 */
+        .result-image-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            min-height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .result-image-container img {
+            max-width: 100%;
+            max-height: 400px;
+            height: auto;
+            display: block;
+        }
+        
+        /* 区域选择样式 */
+        .tracking-container {
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        #selectionCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 3;
+            cursor: crosshair;
+        }
+        
+        .tracking-box {
+            position: absolute;
+            border: 3px solid lime;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+            pointer-events: none;
+            z-index: 4;
+            animation: trackingPulse 2s infinite;
+        }
+        
+        @keyframes trackingPulse {
+            0% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.7); }
+            50% { box-shadow: 0 0 15px rgba(0, 255, 0, 0.9); }
+            100% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.7); }
+        }
+        
+        .tracking-controls {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .tracking-status {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        /* 添加新的基准区域检测样式 */
+        .reference-box {
+            position: absolute;
+            border: 2px dashed lime;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+            pointer-events: none;
+            z-index: 4;
+        }
+        
+        .change-box {
+            position: absolute;
+            border: 3px solid red;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+            pointer-events: none;
+            z-index: 4;
+            animation: changePulse 1.5s infinite;
+        }
+        
+        @keyframes changePulse {
+            0% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.7); }
+            50% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.9); }
+            100% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.7); }
+        }
+        
+        .change-label {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            background: red;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+        
+        /* 添加指标显示样式 */
+        .stats-display {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            z-index: 10;
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+            line-height: 1.2;
+        }
+        
+        .stats-item {
+            margin-bottom: 2px;
+        }
+        
+        .stats-value {
+            font-weight: bold;
+        }
+        
+        .ps-value { color: #ffffff; }
+        .match-value { color: #7fff7f; }
+        .motion-value { color: #7fff7f; }
+        .area-value { color: #7fff7f; }
+        
+        .alert-text {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+            z-index: 10;
+            font-family: Impact, sans-serif;
+            font-size: 32px;
+            color: #ff3333;
+            text-shadow: 2px 2px 2px rgba(0,0,0,0.7);
+            display: none;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-shield-check me-2"></i>图像篡改检测系统
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 检测结果显示 -->
+         
+        <h2 class="text-center mb-4">图像篡改检测系统</h2>
+        <div id="detectionResult" class="row mt-4 d-none">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-search-plus"></i> 检测结果
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-secondary text-white">原始图像</div>
+                                    <div class="card-body result-image-container">
+                                        <img id="originalImg" class="img-fluid" src="" alt="原始图像">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-secondary text-white">检测图像</div>
+                                    <div class="card-body result-image-container">
+                                        <img id="detectImg" class="img-fluid" src="" alt="检测图像">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert" id="detectionAlert" role="alert">
+                                    <div id="detectionStatus" class="mb-2"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="text-center mb-4"></h2>
+        
+        <!-- 图像上传和采集 -->
+        <div class="row">
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-upload me-2"></i>上传图像
+                        </h5>
+                        <form id="uploadForm" class="mb-4">
+                            <div class="form-group mb-3">
+                                <label class="form-label">选择多个图像或文件夹</label>
+                                <input type="file" class="form-control" id="uploadImages" accept="image/*" multiple>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="uploadDirectory">
+                                    <label class="form-check-label" for="uploadDirectory">
+                                        上传文件夹
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-cloud-upload me-2"></i>上传图像
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-search me-2"></i>检测图像
+                        </h5>
+                        <form id="detectForm" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label class="form-label">原始图像</label>
+                                        <input type="file" class="form-control" id="detectOriginal" accept="image/*">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label class="form-label">待检测图像</label>
+                                        <input type="file" class="form-control" id="detectImage" accept="image/*">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-2"></i>开始检测
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-camera me-2"></i>采集图像
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <div class="tracking-container">
+                                        <video id="video" width="100%" autoplay class="mb-3"></video>
+                                        <canvas id="selectionCanvas" style="display:none;"></canvas>
+                                        <div id="referenceBox" class="reference-box" style="display:none;"></div>
+                                        <div id="changeBox" class="change-box" style="display:none;"></div>
+                                        <!-- 添加指标显示和警告文本 -->
+                                        <div id="statsDisplay" class="stats-display" style="display:none;">
+                                            <div class="stats-item">PS: <span id="psValue" class="stats-value ps-value">0.0</span></div>
+                                            <div class="stats-item">Match: <span id="matchValue" class="stats-value match-value">0.0%</span></div>
+                                            <div class="stats-item">Motion: <span id="motionValue" class="stats-value motion-value">0.0</span></div>
+                                            <div class="stats-item">Area: <span id="areaValue" class="stats-value area-value">0.0%</span></div>
+                                        </div>
+                                        <div id="alertText" class="alert-text">NO!ALERT!</div>
+                                    </div>
+                                </div>
+                                <div class="tracking-controls">
+                                    <button class="btn btn-primary" id="startBtn">
+                                        <i class="bi bi-camera-video me-2"></i>打开摄像头
+                                    </button>
+                                    <button class="btn btn-success" id="captureBtn" disabled>
+                                        <i class="bi bi-camera me-2"></i>采集图像
+                                    </button>
+                                    <button class="btn btn-danger" id="stopBtn" disabled>
+                                        <i class="bi bi-camera-video-off me-2"></i>关闭摄像头
+                                    </button>
+                                    <button class="btn btn-warning" id="selectRegionBtn" disabled>
+                                        <i class="bi bi-crop me-2"></i>选择基准区域
+                                    </button>
+                                    <button class="btn btn-info" id="startTrackingBtn" disabled>
+                                        <i class="bi bi-eye me-2"></i>开始监测
+                                    </button>
+                                    <button class="btn btn-secondary" id="stopTrackingBtn" disabled>
+                                        <i class="bi bi-eye-slash me-2"></i>停止监测
+                                    </button>
+                                </div>
+                                <div class="tracking-status" id="trackingStatus"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <img id="capturedImage" class="img-fluid rounded" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图像列表 -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-images me-2"></i>图像列表
+                </h5>
+                <!-- 添加搜索框 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" id="searchInput" class="form-control" placeholder="搜索图像...">
+                            <button class="btn btn-primary" id="searchBtn">
+                                <i class="bi bi-search me-1"></i>搜索
+                            </button>
+                            <button class="btn btn-secondary" id="clearSearchBtn">
+                                <i class="bi bi-x-circle me-1"></i>清除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" id="imageList">
+                    <!-- 图像列表将通过 JavaScript 动态加载 -->
+                </div>
+                <!-- 添加分页控件 -->
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <nav aria-label="图像列表分页">
+                            <ul class="pagination justify-content-center" id="pagination">
+                                <!-- 分页将通过 JavaScript 动态加载 -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量，存储当前分页和搜索状态
+        let currentPage = 1;
+        let currentSearch = '';
+        let totalPages = 1;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadImages(1);
+            
+            // 初始化表单提交事件
+            document.getElementById('uploadForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                uploadImages();
+            });
+            
+            // 初始化检测表单
+            document.getElementById('detectForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                detectUploadedImages();
+            });
+            
+            // 切换上传控件
+            document.getElementById('uploadDirectory').addEventListener('change', toggleUploadControl);
+
+            // 初始化摄像头按钮
+            document.getElementById('startBtn').addEventListener('click', startCamera);
+            document.getElementById('captureBtn').addEventListener('click', captureImage);
+            document.getElementById('stopBtn').addEventListener('click', stopCamera);
+            
+            // 初始化区域选择和跟踪按钮
+            document.getElementById('selectRegionBtn').addEventListener('click', enableRegionSelection);
+            document.getElementById('startTrackingBtn').addEventListener('click', startObjectTracking);
+            document.getElementById('stopTrackingBtn').addEventListener('click', stopObjectTracking);
+            
+            // 初始化搜索按钮
+            document.getElementById('searchBtn').addEventListener('click', function() {
+                const searchText = document.getElementById('searchInput').value.trim();
+                currentSearch = searchText;
+                loadImages(1, searchText);
+            });
+            
+            // 初始化清除搜索按钮
+            document.getElementById('clearSearchBtn').addEventListener('click', function() {
+                document.getElementById('searchInput').value = '';
+                currentSearch = '';
+                loadImages(1, '');
+            });
+            
+            // 支持在搜索框按下回车键进行搜索
+            document.getElementById('searchInput').addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    const searchText = document.getElementById('searchInput').value.trim();
+                    currentSearch = searchText;
+                    loadImages(1, searchText);
+                }
+            });
+        });
+        
+        // 切换上传控件类型（多文件/文件夹）
+        function toggleUploadControl() {
+            const fileInput = document.getElementById('uploadImages');
+            const isDirectory = document.getElementById('uploadDirectory').checked;
+            
+            if (isDirectory) {
+                fileInput.removeAttribute('multiple');
+                fileInput.setAttribute('webkitdirectory', '');
+                fileInput.setAttribute('directory', '');
+            } else {
+                fileInput.setAttribute('multiple', '');
+                fileInput.removeAttribute('webkitdirectory');
+                fileInput.removeAttribute('directory');
+            }
+        }
+
+        // 上传多个图像
+        async function uploadImages() {
+            try {
+                const fileInput = document.getElementById('uploadImages');
+                const files = fileInput.files;
+                
+                if (files.length === 0) {
+                    alert('请选择要上传的图像');
+                    return;
+                }
+                
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                }
+                
+                const response = await fetch('/upload_multiple', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`成功上传 ${result.uploaded_count} 个文件`);
+                    loadImages();
+                    fileInput.value = '';
+                } else {
+                    alert('图像上传失败: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('图像上传失败:', error);
+                alert('图像上传失败: ' + error.message);
+            }
+        }
+        
+        // 检测上传的图像
+        async function detectUploadedImages() {
+            try {
+                // 清除之前的检测结果
+                clearAllTamperedRegions();
+                
+                const originalFile = document.getElementById('detectOriginal').files[0];
+                const detectFile = document.getElementById('detectImage').files[0];
+                
+                if (!originalFile || !detectFile) {
+                    alert('请选择原始图像和待检测图像');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('original', originalFile);
+                formData.append('detect', detectFile);
+                
+                const response = await fetch('/detect_uploaded', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    displayDetectionResult(result);
+                } else {
+                    alert('检测失败: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('检测失败:', error);
+                alert('检测失败: ' + error.message);
+            }
+        }
+
+        // 清除所有篡改区域标记
+        function clearAllTamperedRegions() {
+            // 移除所有覆盖层
+            const overlays = document.querySelectorAll('.tamper-overlay');
+            overlays.forEach(overlay => {
+                if (overlay && overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            });
+            
+            // 清除所有标记框
+            const boxes = document.querySelectorAll('.tamper-box');
+            boxes.forEach(box => {
+                if (box && box.parentNode) {
+                    box.parentNode.removeChild(box);
+                }
+            });
+            
+            // 解除事件监听器
+            const detectImg = document.getElementById('detectImg');
+            if (detectImg) {
+                const newImg = detectImg.cloneNode(true);
+                if (detectImg.parentNode) {
+                    detectImg.parentNode.replaceChild(newImg, detectImg);
+                }
+            }
+            
+            console.log("已清除所有篡改区域标记和事件监听");
+        }
+
+        // 显示检测结果
+        function displayDetectionResult(data) {
+            console.log("接收到的检测结果数据:", data);
+            
+            // 先移除结果区域，重置状态
+            $('#detectionResult').addClass('d-none');
+            
+            // 清除所有现有标记框
+            clearAllTamperedRegions();
+            
+            // 重置图像
+            $('#originalImg').attr('src', '');
+            $('#detectImg').attr('src', '');
+            
+            // 再显示结果区域
+            setTimeout(() => {
+                $('#detectionResult').removeClass('d-none');
+                
+                // 显示图像 - 确保正确显示原始图像和解密后的图像
+                if (data.encrypted_image) {
+                    $('#originalImg').attr('src', 'data:image/jpeg;base64,' + data.encrypted_image);
+                    console.log("设置原始图像(解密后的加密图像)");
+                }
+                
+                if (data.original_image) {
+                    $('#detectImg').attr('src', 'data:image/jpeg;base64,' + data.original_image);
+                    console.log("设置检测图像(原始上传图像)");
+                }
+                
+                // 显示检测结果
+                const isTampered = data.is_tampered;
+                
+                if (isTampered) {
+                    $('#detectionAlert').removeClass('alert-success').addClass('alert-danger');
+                    $('#detectionStatus').html(`<strong>图像已被篡改! 检测到 ${data.tampered_regions ? data.tampered_regions.length : 0} 处篡改区域</strong>`);
+                    
+                    // 等待图像完全加载后再绘制篡改区域
+                    if (data.tampered_regions && data.tampered_regions.length > 0) {
+                        console.log("等待图像加载完成后标记篡改区域");
+                        
+                        const detectImg = document.getElementById('detectImg');
+                        detectImg.onload = function() {
+                            console.log("检测图像加载完成，准备标记篡改区域");
+                            // 使用更长的延迟确保DOM完全更新
+                            setTimeout(() => {
+                                drawTamperedRegions('detectImg', data.tampered_regions);
+                            }, 500);
+                        };
+                    }
+                } else {
+                    $('#detectionAlert').removeClass('alert-danger').addClass('alert-success');
+                    $('#detectionStatus').html('<strong>图像未被篡改</strong>');
+                }
+                
+                // 滚动到结果区域
+                $('html, body').animate({
+                    scrollTop: $("#detectionResult").offset().top - 50
+                }, 500);
+            }, 100);
+        }
+
+        // 在图像上绘制篡改区域
+        function drawTamperedRegions(imgId, regions) {
+            if (!regions || regions.length === 0) {
+                console.log("没有篡改区域可供标记");
+                return;
+            }
+            
+            const img = document.getElementById(imgId);
+            if (!img) {
+                console.error('找不到图像元素:', imgId);
+                return;
+            }
+            
+            // 必须确保图像已完全加载并渲染，才能获取正确尺寸
+            if (!img.complete || img.naturalWidth === 0) {
+                console.log("图像尚未完全加载，延迟标记");
+                img.onload = function() {
+                    setTimeout(() => drawTamperedRegionsOnImage(img, regions), 100);
+                };
+                return;
+            }
+            
+            drawTamperedRegionsOnImage(img, regions);
+        }
+        
+        function drawTamperedRegionsOnImage(img, regions) {
+            console.log(`准备绘制 ${regions.length} 个篡改区域`);
+            
+            // 获取图像实际容器元素
+            const parent = img.closest('.result-image-container');
+            if (!parent) {
+                console.error('找不到图像容器');
+                return;
+            }
+            
+            // 确保容器有定位属性
+            parent.style.position = 'relative';
+            
+            // 清除已有的覆盖层
+            const existingOverlays = parent.querySelectorAll('.tamper-overlay');
+            existingOverlays.forEach(overlay => parent.removeChild(overlay));
+            
+            // 获取图像当前实际显示尺寸和位置
+            const imgRect = img.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
+            
+            // 计算图像在容器内的偏移量
+            const offsetX = imgRect.left - parentRect.left;
+            const offsetY = imgRect.top - parentRect.top;
+            
+            // 创建新的覆盖层，并设置为与图像大小和位置一致
+            const overlay = document.createElement('div');
+            overlay.className = 'tamper-overlay';
+            overlay.style.position = 'absolute';
+            overlay.style.top = offsetY + 'px';
+            overlay.style.left = offsetX + 'px';
+            overlay.style.width = imgRect.width + 'px';
+            overlay.style.height = imgRect.height + 'px';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.zIndex = '2';
+            parent.appendChild(overlay);
+            
+            // 计算图像缩放比例
+            const imgWidth = imgRect.width;
+            const imgHeight = imgRect.height;
+            const naturalWidth = img.naturalWidth;
+            const naturalHeight = img.naturalHeight;
+            
+            const scaleX = imgWidth / naturalWidth;
+            const scaleY = imgHeight / naturalHeight;
+            
+            console.log(`图像尺寸 - 原始: ${naturalWidth}x${naturalHeight}, ` +
+                       `显示: ${imgWidth}x${imgHeight}, ` +
+                       `缩放: X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}, ` +
+                       `偏移: X=${offsetX.toFixed(1)}, Y=${offsetY.toFixed(1)}`);
+            
+            // 遍历所有篡改区域
+            regions.forEach((region, index) => {
+                // 获取原始区域坐标
+                const { x, y, width, height } = region;
+                console.log(`区域 #${index+1} 原始坐标:`, region);
+                
+                // 计算缩放后的坐标 (绝对定位，不需要加上偏移量，因为覆盖层已经定位)
+                const scaledX = Math.round(x * scaleX);
+                const scaledY = Math.round(y * scaleY);
+                const scaledWidth = Math.max(Math.round(width * scaleX), 15);
+                const scaledHeight = Math.max(Math.round(height * scaleY), 15);
+                console.log(`区域 #${index+1} 缩放后:`, { x: scaledX, y: scaledY, w: scaledWidth, h: scaledHeight });
+                
+                // 创建标记框
+                const box = document.createElement('div');
+                box.className = 'tamper-box';
+                box.style.left = `${scaledX}px`;
+                box.style.top = `${scaledY}px`;
+                box.style.width = `${scaledWidth}px`;
+                box.style.height = `${scaledHeight}px`;
+                
+                // 添加标签
+                const label = document.createElement('div');
+                label.className = 'tamper-label';
+                label.textContent = `篡改区域 #${index+1}`;
+                box.appendChild(label);
+                
+                // 将标记添加到覆盖层
+                overlay.appendChild(box);
+                console.log(`已添加篡改区域 #${index+1} 标记`);
+            });
+        }
+
+        // 打开摄像头
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                window.currentStream = stream;
+                document.getElementById('captureBtn').disabled = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('selectRegionBtn').disabled = false;
+                
+                // 初始化画布大小
+                const canvas = document.getElementById('selectionCanvas');
+                
+                // 等待视频元数据加载
+                video.onloadedmetadata = function() {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // 更新跟踪状态
+                    updateTrackingStatus('摄像头已启动，可以选择跟踪区域');
+                };
+            } catch (error) {
+                console.error('无法访问摄像头:', error);
+                alert('无法访问摄像头: ' + error.message);
+            }
+        }
+
+        // 关闭摄像头
+        function stopCamera() {
+            try {
+                stopObjectTracking();
+                
+                const video = document.getElementById('video');
+                if (window.currentStream) {
+                    const tracks = window.currentStream.getTracks();
+                    tracks.forEach(track => track.stop());
+                    video.srcObject = null;
+                    window.currentStream = null;
+                    document.getElementById('captureBtn').disabled = true;
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('selectRegionBtn').disabled = true;
+                    document.getElementById('startTrackingBtn').disabled = true;
+                    document.getElementById('stopTrackingBtn').disabled = true;
+                    
+                    // 隐藏画布和跟踪框
+                    document.getElementById('selectionCanvas').style.display = 'none';
+                    document.getElementById('referenceBox').style.display = 'none';
+                    document.getElementById('changeBox').style.display = 'none';
+                    
+                    // 更新跟踪状态
+                    updateTrackingStatus('摄像头已关闭');
+                }
+            } catch (error) {
+                console.error('关闭摄像头失败:', error);
+                alert('关闭摄像头失败: ' + error.message);
+            }
+        }
+        
+        // 更新跟踪状态信息
+        function updateTrackingStatus(message) {
+            const statusElement = document.getElementById('trackingStatus');
+            statusElement.textContent = message;
+        }
+        
+        // 区域选择变量
+        let isSelecting = false;
+        let startX = 0, startY = 0;
+        let selectedRegion = null;
+        let trackingInterval = null;
+        
+        // 启用区域选择
+        function enableRegionSelection() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('selectionCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 显示选择画布
+            canvas.style.display = 'block';
+            
+            // 清除之前可能存在的选择
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 更新状态
+            isSelecting = true;
+            selectedRegion = null;
+            document.getElementById('referenceBox').style.display = 'none';
+            document.getElementById('changeBox').style.display = 'none';
+            document.getElementById('startTrackingBtn').disabled = true;
+            
+            // 更新跟踪状态
+            updateTrackingStatus('请点击并拖动鼠标选择要监测的基准区域');
+            
+            // 添加鼠标事件
+            canvas.onmousedown = function(e) {
+                if (!isSelecting) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                startX = e.clientX - rect.left;
+                startY = e.clientY - rect.top;
+            };
+            
+            canvas.onmousemove = function(e) {
+                if (!isSelecting || e.buttons !== 1) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+                
+                // 清除之前的绘制
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制选择框
+                ctx.strokeStyle = 'lime';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.rect(startX, startY, currentX - startX, currentY - startY);
+                ctx.stroke();
+            };
+            
+            canvas.onmouseup = function(e) {
+                if (!isSelecting) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const endX = e.clientX - rect.left;
+                const endY = e.clientY - rect.top;
+                
+                // 确保有效的选择区域
+                if (Math.abs(endX - startX) > 20 && Math.abs(endY - startY) > 20) {
+                    selectedRegion = {
+                        x: Math.min(startX, endX),
+                        y: Math.min(startY, endY),
+                        width: Math.abs(endX - startX),
+                        height: Math.abs(endY - startY)
+                    };
+                    
+                    // 更新跟踪状态
+                    updateTrackingStatus(`已选择基准区域: (${Math.round(selectedRegion.x)}, ${Math.round(selectedRegion.y)}, ${Math.round(selectedRegion.width)}, ${Math.round(selectedRegion.height)})`);
+                    
+                    // 启用开始跟踪按钮
+                    document.getElementById('startTrackingBtn').disabled = false;
+                } else {
+                    // 区域太小
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    updateTrackingStatus('选择的区域太小，请重新选择更大的区域');
+                }
+                
+                // 重置选择状态
+                isSelecting = false;
+            };
+        }
+        
+        // 停止区域监测
+        function stopObjectTracking() {
+            // 清除监测间隔
+            if (trackingInterval) {
+                clearInterval(trackingInterval);
+                trackingInterval = null;
+            }
+            
+            // 隐藏所有显示元素
+            document.getElementById('referenceBox').style.display = 'none';
+            document.getElementById('changeBox').style.display = 'none';
+            document.getElementById('selectionCanvas').style.display = 'none';
+            document.getElementById('statsDisplay').style.display = 'none';
+            document.getElementById('alertText').style.display = 'none';
+            
+            // 无条件更新按钮状态
+            document.getElementById('selectRegionBtn').disabled = !document.getElementById('startBtn').disabled;
+            document.getElementById('startTrackingBtn').disabled = true;
+            document.getElementById('stopTrackingBtn').disabled = true;
+            
+            // 更新跟踪状态
+            updateTrackingStatus('区域监测已停止');
+            
+            // 清除变化标签
+            const changeBox = document.getElementById('changeBox');
+            if (changeBox.querySelector('.change-label')) {
+                changeBox.innerHTML = '';
+            }
+        }
+
+        // 开始区域变化监测
+        function startObjectTracking() {
+            if (!selectedRegion) {
+                alert('请先选择要监测的基准区域');
+                return;
+            }
+            
+            const video = document.getElementById('video');
+            const referenceBox = document.getElementById('referenceBox');
+            const changeBox = document.getElementById('changeBox');
+            const selectionCanvas = document.getElementById('selectionCanvas');
+            const statsDisplay = document.getElementById('statsDisplay');
+            const alertText = document.getElementById('alertText');
+            
+            // 显示统计数据
+            statsDisplay.style.display = 'block';
+            
+            // 隐藏选择画布，显示基准框
+            selectionCanvas.style.display = 'none';
+            referenceBox.style.display = 'block';   // 绿色基准框始终显示
+            changeBox.style.display = 'none';       // 红色框初始不显示
+            
+            // 初始化基准框位置 - 只设置一次，不再改变
+            updateBoxPosition(referenceBox, selectedRegion);
+            
+            // 更新按钮状态
+            document.getElementById('selectRegionBtn').disabled = true;
+            document.getElementById('startTrackingBtn').disabled = true;
+            document.getElementById('stopTrackingBtn').disabled = false;
+            
+            // 更新跟踪状态
+            updateTrackingStatus('正在监测基准区域的变化...');
+            
+            // 创建用于监测的离屏画布
+            const trackingCanvas = document.createElement('canvas');
+            trackingCanvas.width = video.videoWidth;
+            trackingCanvas.height = video.videoHeight;
+            const trackingCtx = trackingCanvas.getContext('2d');
+            
+            // 存储初始区域图像作为基准
+            trackingCtx.drawImage(video, 0, 0, trackingCanvas.width, trackingCanvas.height);
+            const referenceTemplate = trackingCtx.getImageData(
+                selectedRegion.x, 
+                selectedRegion.y, 
+                selectedRegion.width, 
+                selectedRegion.height
+            );
+            
+            // 变化检测阈值 - 降低以提高灵敏度
+            const changeThreshold = 12; // 降低阈值以提高灵敏度
+            let isChangeDetected = false;
+            let changeRegion = null;
+            
+            // 帧率计算变量
+            let frameCount = 0;
+            let lastTime = performance.now();
+            let fps = 0;
+            
+            // 启动监测循环
+            trackingInterval = setInterval(() => {
+                if (!video.paused && !video.ended && trackingInterval) {
+                    try {
+                        // 确保基准框始终可见
+                        referenceBox.style.display = 'block';
+                        
+                        // 获取当前帧
+                        trackingCtx.drawImage(video, 0, 0, trackingCanvas.width, trackingCanvas.height);
+                        
+                        // 获取当前区域图像数据
+                        const currentData = trackingCtx.getImageData(
+                            selectedRegion.x,
+                            selectedRegion.y,
+                            selectedRegion.width,
+                            selectedRegion.height
+                        );
+                        
+                        // 检测变化
+                        const result = detectChangeWithRegion(referenceTemplate, currentData, selectedRegion);
+                        const changeScore = result.score;
+                        
+                        // 更新统计指标
+                        // 计算FPS
+                        frameCount++;
+                        const now = performance.now();
+                        const elapsedTime = now - lastTime;
+                        if (elapsedTime >= 1000) {
+                            fps = (frameCount * 1000 / elapsedTime).toFixed(1);
+                            frameCount = 0;
+                            lastTime = now;
+                        }
+                        
+                        // 更新显示数据
+                        document.getElementById('psValue').textContent = fps;
+                        
+                        // 计算匹配度 (100% - 变化百分比)
+                        const matchPercent = Math.max(0, 100 - (changeScore * 10)).toFixed(2);
+                        document.getElementById('matchValue').textContent = matchPercent + '%';
+                        
+                        // 设置运动值 - 基于变化分数
+                        document.getElementById('motionValue').textContent = changeScore.toFixed(1);
+                        
+                        // 计算区域变化率
+                        let areaPercent = '0.0';
+                        if (result.region && selectedRegion) {
+                            const totalArea = selectedRegion.width * selectedRegion.height;
+                            const changedArea = result.region.width * result.region.height;
+                            areaPercent = ((changedArea / totalArea) * 100).toFixed(1);
+                        }
+                        document.getElementById('areaValue').textContent = areaPercent + '%';
+                        
+                        // 判断是否触发警报
+                        if (changeScore > changeThreshold) {
+                            // 检测到变化
+                            console.log(`检测到区域变化，分数: ${changeScore}`);
+                            updateTrackingStatus(`警告: 检测到区域变化! 变化程度: ${changeScore.toFixed(2)}`);
+                            
+                            // 显示警告文本
+                            alertText.style.display = 'block';
+                            
+                            // 如果检测到变化区域，显示红色跟踪框
+                            if (result.region) {
+                                // 转换为相对于视频的坐标
+                                changeRegion = {
+                                    x: selectedRegion.x + result.region.x,
+                                    y: selectedRegion.y + result.region.y,
+                                    width: result.region.width,
+                                    height: result.region.height
+                                };
+                                
+                                // 显示变化框并更新位置
+                                changeBox.style.display = 'block';
+                                updateBoxPosition(changeBox, changeRegion);
+                                
+                                // 添加或更新变化标签
+                                if (!changeBox.querySelector('.change-label')) {
+                                    const label = document.createElement('div');
+                                    label.className = 'change-label';
+                                    label.textContent = '检测到变化';
+                                    changeBox.appendChild(label);
+                                }
+                                
+                                isChangeDetected = true;
+                            } else if (!isChangeDetected) {
+                                // 没有精确区域就在整个区域中间显示红色框
+                                const padding = Math.min(selectedRegion.width, selectedRegion.height) * 0.2;
+                                changeRegion = {
+                                    x: selectedRegion.x + padding,
+                                    y: selectedRegion.y + padding,
+                                    width: selectedRegion.width - padding * 2,
+                                    height: selectedRegion.height - padding * 2
+                                };
+                                
+                                // 显示变化框并更新位置
+                                changeBox.style.display = 'block';
+                                updateBoxPosition(changeBox, changeRegion);
+                                
+                                if (!changeBox.querySelector('.change-label')) {
+                                    const label = document.createElement('div');
+                                    label.className = 'change-label';
+                                    label.textContent = '检测到变化';
+                                    changeBox.appendChild(label);
+                                }
+                                
+                                isChangeDetected = true;
+                            }
+                        } else {
+                            // 没有检测到变化或变化小于阈值
+                            if (isChangeDetected) {
+                                console.log('区域恢复正常');
+                                updateTrackingStatus('基准区域监测中...');
+                                // 隐藏变化框和警告文本，但保持基准框显示
+                                changeBox.style.display = 'none';
+                                alertText.style.display = 'none';
+                                isChangeDetected = false;
+                                changeRegion = null;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('监测过程中出错:', e);
+                        // 出错时不停止，继续尝试下一帧
+                    }
+                }
+            }, 50); // 保持高帧率以获得更流畅的跟踪效果
+        }
+        
+        // 带区域检测的变化检测函数
+        function detectChangeWithRegion(referenceData, currentData, baseRegion) {
+            let diffSum = 0;
+            let pixelCount = 0;
+            let maxChange = 0;
+            
+            // 创建差异矩阵以找出变化区域
+            const width = baseRegion.width;
+            const height = baseRegion.height;
+            const diffMatrix = new Array(height).fill().map(() => new Array(width).fill(0));
+            
+            // 计算每个像素的差异并填充矩阵 - 使用步长1以提高精度
+            const stepSize = 1;
+            for (let y = 0; y < height; y += stepSize) {
+                for (let x = 0; x < width; x += stepSize) {
+                    const i = ((y * width) + x) * 4;
+                    
+                    if (i < referenceData.data.length && i < currentData.data.length) {
+                        // 计算RGB差异
+                        const r1 = referenceData.data[i];
+                        const g1 = referenceData.data[i + 1];
+                        const b1 = referenceData.data[i + 2];
+                        
+                        const r2 = currentData.data[i];
+                        const g2 = currentData.data[i + 1];
+                        const b2 = currentData.data[i + 2];
+                        
+                        // 计算颜色差异值
+                        const pixelDiff = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+                        
+                        // 更新最大变化值
+                        if (pixelDiff > maxChange) {
+                            maxChange = pixelDiff;
+                        }
+                        
+                        // 记录差异
+                        diffMatrix[y][x] = pixelDiff;
+                        diffSum += pixelDiff;
+                        pixelCount++;
+                    }
+                }
+            }
+            
+            // 计算平均差异分数
+            const avgDiff = diffSum / (pixelCount * 3); // 3个通道
+            
+            // 使用更低的阈值检测变化
+            const pixelThreshold = Math.max(30, avgDiff * 2); // 动态阈值，至少30
+            
+            // 找出变化区域
+            if (avgDiff > 10) { // 降低整体变化阈值，更敏感地检测变化
+                const region = findChangedRegionBounds(diffMatrix, width, height, pixelThreshold);
+                return { score: avgDiff, region: region };
+            }
+            
+            return { score: avgDiff, region: null };
+        }
+        
+        // 查找变化区域
+        function findChangedRegionBounds(diffMatrix, width, height, threshold) {
+            // 应用阈值，创建二值化矩阵
+            const binaryMatrix = new Array(height).fill().map(() => new Array(width).fill(0));
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    binaryMatrix[y][x] = diffMatrix[y][x] > threshold ? 1 : 0;
+                }
+            }
+            
+            // 查找变化区域的边界
+            let minX = width, minY = height, maxX = 0, maxY = 0;
+            let hasChanges = false;
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (binaryMatrix[y][x] === 1) {
+                        hasChanges = true;
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            // 如果没有找到显著变化，返回null
+            if (!hasChanges) {
+                return null;
+            }
+            
+            // 扩展边界以确保完整包围变化区域
+            const padding = 5;
+            minX = Math.max(0, minX - padding);
+            minY = Math.max(0, minY - padding);
+            maxX = Math.min(width - 1, maxX + padding);
+            maxY = Math.min(height - 1, maxY + padding);
+            
+            // 确保区域大小合理
+            const regionWidth = maxX - minX + 1;
+            const regionHeight = maxY - minY + 1;
+            
+            // 如果区域太小，扩大到最小可见大小
+            const minRegionSize = 20;
+            if (regionWidth < minRegionSize || regionHeight < minRegionSize) {
+                const centerX = minX + regionWidth / 2;
+                const centerY = minY + regionHeight / 2;
+                const halfSize = minRegionSize / 2;
+                
+                minX = Math.max(0, Math.floor(centerX - halfSize));
+                minY = Math.max(0, Math.floor(centerY - halfSize));
+                maxX = Math.min(width - 1, Math.ceil(centerX + halfSize));
+                maxY = Math.min(height - 1, Math.ceil(centerY + halfSize));
+            }
+            
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX + 1,
+                height: maxY - minY + 1
+            };
+        }
+
+        // 更新框位置
+        function updateBoxPosition(boxElement, region) {
+            const video = document.getElementById('video');
+            const videoRect = video.getBoundingClientRect();
+            
+            // 计算视频元素缩放比例
+            const scaleX = videoRect.width / video.videoWidth;
+            const scaleY = videoRect.height / video.videoHeight;
+            
+            // 应用缩放后的位置和尺寸
+            boxElement.style.left = (region.x * scaleX) + 'px';
+            boxElement.style.top = (region.y * scaleY) + 'px';
+            boxElement.style.width = (region.width * scaleX) + 'px';
+            boxElement.style.height = (region.height * scaleY) + 'px';
+        }
+
+        // 截取图像
+        async function captureImage() {
+            try {
+                const video = document.getElementById('video');
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // 显示采集的图像
+                const capturedImage = document.getElementById('capturedImage');
+                capturedImage.src = canvas.toDataURL('image/jpeg');
+                capturedImage.style.display = 'block';
+                
+                // 将图像转换为base64
+                const imageBase64 = canvas.toDataURL('image/jpeg');
+                
+                // 发送到服务器
+                const response = await fetch('/capture', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: imageBase64 })
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    alert('图像采集成功');
+                    loadImages();
+                } else {
+                    alert('图像采集失败: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('图像采集失败:', error);
+                alert('图像采集失败: ' + error.message);
+            }
+        }
+
+        // 检测已保存的图像
+        async function detectImage(imageId) {
+            try {
+                // 清除之前的检测结果
+                clearAllTamperedRegions();
+                
+                const response = await fetch(`/detect/${imageId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    displayDetectionResult(result);
+                } else {
+                    alert('检测失败: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('检测失败:', error);
+                alert('检测失败: ' + error.message);
+            }
+        }
+
+        // 加载图像列表
+        async function loadImages(page = 1, search = '') {
+            try {
+                // 更新当前页码
+                currentPage = page;
+                
+                // 构建查询URL
+                let url = `/images?page=${page}&page_size=6`;
+                if (search && search.trim()) {
+                    url += `&search=${encodeURIComponent(search)}`;
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                // 保存分页信息
+                totalPages = data.pagination.total_pages;
+                
+                const imageList = document.getElementById('imageList');
+                imageList.innerHTML = '';
+                
+                // 检查是否有图像数据
+                if (data.images.length === 0) {
+                    imageList.innerHTML = '<div class="col-12 text-center"><p>没有找到符合条件的图像</p></div>';
+                } else {
+                    // 渲染图像列表
+                    data.images.forEach(image => {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-4 mb-4';
+                        const imageName = image.original_path.split('\\').pop().split('/').pop();
+                        col.innerHTML = `
+                            <div class="card">
+                                <img src="/static/uploads/${imageName}" 
+                                     class="card-img-top preview-image" alt="预览图">
+                                <div class="card-body">
+                                    <h5 class="card-title">${imageName}</h5>
+                                    <p class="card-text">上传时间: ${new Date(image.timestamp).toLocaleString()}</p>
+                                    <button class="btn btn-primary" onclick="detectImage('${image.id}')">检测</button>
+                                    <button class="btn btn-danger" onclick="deleteImage('${image.id}')">删除</button>
+                                </div>
+                            </div>
+                        `;
+                        imageList.appendChild(col);
+                    });
+                }
+                
+                // 更新分页控件
+                updatePagination(data.pagination);
+                
+            } catch (error) {
+                console.error('加载图像列表失败:', error);
+                alert('加载图像列表失败: ' + error.message);
+            }
+        }
+        
+        // 更新分页控件
+        function updatePagination(pagination) {
+            const paginationElement = document.getElementById('pagination');
+            paginationElement.innerHTML = '';
+            
+            // 如果总页数小于等于1，不显示分页
+            if (pagination.total_pages <= 1) {
+                return;
+            }
+            
+            // 添加"上一页"按钮
+            const prevItem = document.createElement('li');
+            prevItem.className = `page-item ${pagination.current_page === 1 ? 'disabled' : ''}`;
+            prevItem.innerHTML = `
+                <a class="page-link" href="javascript:void(0)" aria-label="上一页" ${pagination.current_page === 1 ? '' : `onclick="loadImages(${pagination.current_page - 1}, '${currentSearch}'); return false;"`}>
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            `;
+            paginationElement.appendChild(prevItem);
+            
+            // 添加页码按钮
+            const maxVisiblePages = 5; // 最多显示的页码数量
+            let startPage = Math.max(1, pagination.current_page - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(pagination.total_pages, startPage + maxVisiblePages - 1);
+            
+            // 如果结束页码小于最大显示页码数，调整起始页码
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            // 添加页码按钮
+            for (let i = startPage; i <= endPage; i++) {
+                const pageItem = document.createElement('li');
+                pageItem.className = `page-item ${i === pagination.current_page ? 'active' : ''}`;
+                pageItem.innerHTML = `
+                    <a class="page-link" href="javascript:void(0)" onclick="loadImages(${i}, '${currentSearch}'); return false;">${i}</a>
+                `;
+                paginationElement.appendChild(pageItem);
+            }
+            
+            // 添加"下一页"按钮
+            const nextItem = document.createElement('li');
+            nextItem.className = `page-item ${pagination.current_page === pagination.total_pages ? 'disabled' : ''}`;
+            nextItem.innerHTML = `
+                <a class="page-link" href="javascript:void(0)" aria-label="下一页" ${pagination.current_page === pagination.total_pages ? '' : `onclick="loadImages(${pagination.current_page + 1}, '${currentSearch}'); return false;"`}>
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            `;
+            paginationElement.appendChild(nextItem);
+        }
+
+        // 删除图像
+        async function deleteImage(imageId) {
+            if (confirm('确定要删除此图像吗？')) {
+                try {
+                    const response = await fetch(`/images/${imageId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        alert('图像删除成功');
+                        loadImages(currentPage, currentSearch); // 保持当前页码和搜索条件
+                    } else {
+                        const result = await response.json();
+                        alert('图像删除失败: ' + result.detail);
+                    }
+                } catch (error) {
+                    console.error('图像删除失败:', error);
+                    alert('图像删除失败: ' + error.message);
+                }
+            }
+        }
+    </script>
+</body>
+</html> 
